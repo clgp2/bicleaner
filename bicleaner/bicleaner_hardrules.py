@@ -10,6 +10,7 @@ import sys
 import traceback
 import yaml
 import fasttext
+#test
 
 from heapq import heappush, heappop
 from multiprocessing import Queue, Process, Value, cpu_count
@@ -69,7 +70,27 @@ def initialization():
     groupO.add_argument('-p', '--processes', type=int, default=max(1, cpu_count()-1), help="Number of processes to use")
 
     groupO.add_argument('--disable_lang_ident', default=False, action='store_true', help="Don't apply rules that use language detecting")
-    groupO.add_argument('--disable_minimal_length', default=False, action='store_true', help="Don't apply minimal length rule")
+    groupO.add_argument('--disable_minimal_length', default=True, action='store_true', help="Don't apply minimal length rule")
+    #here are the added arguments
+    groupO.add_argument('--disable_max_length', default=False, action='store_true', help="Don't apply max length rule")
+    groupO.add_argument('--disable_reply', default=False, action='store_true')
+    groupO.add_argument('--disable_length_ratio', default=False, action='store_true')
+    groupO.add_argument('--disable_identical', default=False, action='store_true')
+    groupO.add_argument('--disable_nonidentical_digits', default=False, action='store_true')
+    groupO.add_argument('--disable_nonidentical_punct', default=False, action='store_true')
+    groupO.add_argument('--disable_majority_nonalpha', default=False, action='store_true')
+    groupO.add_argument('--disable_long_url', default=False, action='store_true')
+    groupO.add_argument('--disable_breadcrumbs', default=False, action='store_true')
+    groupO.add_argument('--disable_glued_words', default=False, action='store_true')
+    groupO.add_argument('--disable_unicode_noise', default=False, action='store_true')
+    groupO.add_argument('--disable_space_noise', default=False, action='store_true')
+    groupO.add_argument('--disable_paren_check', default=False, action='store_true')
+    groupO.add_argument('--disable_unwanted_chars', default=False, action='store_true')
+    groupO.add_argument('--disable_inconditional', default=False, action='store_true')
+    groupO.add_argument('--disable_escaped_unicode', default=False, action='store_true')
+    groupO.add_argument('--disable_literals_check', default=False, action='store_true')
+    groupO.add_argument('--disable_titlecased_check', default=False, action='store_true')
+
     groupO.add_argument('--disable_porn_removal', default=False, action='store_true', help="Don't apply porn removal")
 
     groupO.add_argument("-s", "--source_lang", type=str, default=None,  help="Source language (SL) of the input")
@@ -82,6 +103,10 @@ def initialization():
     groupO.add_argument("-T", "--target_tokenizer_command", default=None, type=str, help="Target language (TL) tokenizer full command")
 
     
+    # groupMod=parser.add_mutually_exclusive_group()
+    # groupMod.add_argument('-n', '--normal', action='store_true', help='run bicleaner hardrules')
+    # groupMod.add_argument('-m', '--modified', action='store_true', help='run bicleaner hardrules with less rules')
+
     #LM  filtering
     groupO.add_argument('--disable_lm_filter', default=False, action='store_true', help="Don't apply LM filtering")
     groupO.add_argument('--metadata', type=argparse.FileType('r'), default=None, help="Training metadata (YAML file)")    
@@ -334,79 +359,79 @@ def c_no_porn(left, right, model, side, porn_tokenizer):
     return model.predict(porn_tokenizer.detokenize(tok))[0][0] == '__label__negative'
 
 def wrong_tu(left, right, args, lm_filter = None, porn_removal = None, porn_tokenizer = None):
-    if len(left) >= 1024:
+    if not args.disable_max_length and len(left) >= 1024:
         return "len(left) >= 1024"
-    if len(right) >= 1024:
+    if not args.disable_max_length and len(right) >= 1024:
         return "len(right) >= 1024"
-    elif not c_no_literals(["Re:"], left):
+    elif not args.disable_reply and not c_no_literals(["Re:"], left):
         return "c_no_literals(['Re:'], left)"
-    elif not c_no_literals(["Re:"], right):
+    elif not args.disable_reply and not c_no_literals(["Re:"], right):
         return "c_no_literals(['Re:'], right)"            
     elif not args.disable_minimal_length and not (c_minimal_length(left) or c_minimal_length(right)):
         return "c_minimal_length(left) and c_minimal_length(right)"
-    elif not (c_length(left, right) or c_length_bytes(left, right)): 
+    elif not args.disable_length_ratio and not (c_length(left, right) or c_length_bytes(left, right)): 
         return "c_length or c_length_bytes"
-    elif not c_identical(left, right, args.source_lang, args.target_lang):
+    elif not args.disable_identical and not c_identical(left, right, args.source_lang, args.target_lang):
         return "c_identical"
-    elif not c_identical_wo_digits(left, right, args.source_lang, args.target_lang):
+    elif not args.disable_nonidentical_digits and not c_identical_wo_digits(left, right, args.source_lang, args.target_lang):
         return "c_identical_wo_digits"    
-    elif not c_identical_wo_punct(left, right, args.source_lang, args.target_lang):
+    elif not args.disable_nonidentical_punct and not c_identical_wo_punct(left, right, args.source_lang, args.target_lang):
         return "c_identical_wo_punct"    
     elif (not args.disable_lang_ident and not  c_different_language(left, right, args.source_lang, args.target_lang)):
         return "c_different_language"
-    elif not c_majority_alpha(left):
+    elif not args.disable_majority_nonalpha and not c_majority_alpha(left):
         return "c_majority_alpha(left)"
-    elif not c_majority_alpha(right):
+    elif not args.disable_majority_nonalpha and not c_majority_alpha(right):
         return "c_majority_alpha(right)"
-    elif not c_no_urls(left):
+    elif not args.disable_long_url and not c_no_urls(left):
         return "c_no_urls(left)"
-    elif not c_no_urls(right):
+    elif not args.disable_long_url and not c_no_urls(right):
         return "c_no_urls(right)"
     #elif not c_no_breadcrumbs(left):    
     #    return "c_no_breadcrumbs(left)"
     #elif not c_no_breadcrumbs(right):
     #    return "c_no_breadcrumbs(right)"
-    elif not c_no_breadcrumbs1(left):
+    elif not args.disable_breadcrumbs and not c_no_breadcrumbs1(left):
         return "c_no_breadcrumbs1(left)"
-    elif not c_no_breadcrumbs1(right):
+    elif not args.disable_breadcrumbs and not c_no_breadcrumbs1(right):
         return "c_no_breadcrumbs1(right)"
-    elif not c_no_breadcrumbs2(left):
+    elif not args.disable_breadcrumbs and not c_no_breadcrumbs2(left):
         return "c_no_breadcrumbs2(left)"
-    elif not c_no_breadcrumbs2(right):
+    elif not args.disable_breadcrumbs and not c_no_breadcrumbs2(right):
         return "c_no_breadcrumbs2(right)"       
-    elif not c_no_glued_words(left):
+    elif not args.disable_glued_words and not c_no_glued_words(left):
         return "c_no_glued_words(left)"
-    elif not c_no_glued_words(right):
+    elif not args.disable_glued_words and not c_no_glued_words(right):
         return "c_no_glued_words(right)"    
-    elif args.source_lang in safe_noise_detection_langs and not c_no_noise(left):
+    elif not args.disable_unicode_noise and args.source_lang in safe_noise_detection_langs and not c_no_noise(left):
         return "args.source_lang in safe_noise_detection_langs and not c_no_noise(left)" 
-    elif args.target_lang in safe_noise_detection_langs and not c_no_noise(right):
+    elif not args.disable_unicode_noise and args.target_lang in safe_noise_detection_langs and not c_no_noise(right):
         return "args.target_lang in safe_noise_detection_langs and not c_no_noise(right)"
-    elif not c_no_space_noise(left):
+    elif not args.disable_space_noise and not c_no_space_noise(left):
         return "c_no_space_noise(left)"
-    elif not c_no_space_noise(right):
+    elif not args.disable_space_noise and not c_no_space_noise(right):
         return "c_no_space_noise(right)"
-    elif not c_no_paren(left):
+    elif not args.disable_paren_check and not c_no_paren(left):
         return "c_no_paren(left)"
-    elif not c_no_paren(right):
+    elif not args.disable_paren_check and not c_no_paren(right):
         return "c_no_paren(right)"
-    elif not c_unwanted(left):
+    elif not args.disable_unwanted_chars and not c_unwanted(left):
         return "c_unwanted(left)"
-    elif not c_unwanted(right):
+    elif not args.disable_unwanted_chars and not c_unwanted(right):
         return "c_unwanted(right)"
-    elif not c_inconditional(left):
+    elif not args.disable_inconditional and not c_inconditional(left):
         return "c_inconditional(left)"
-    elif not c_inconditional(right):
+    elif not args.disable_inconditional and not c_inconditional(right):
         return "c_inconditional(right)"
-    elif not c_no_escaped_unicode(left):
+    elif not args.disable_escaped_unicode and not c_no_escaped_unicode(left):
         return "c_no_escaped_unicode(left)"
-    elif not c_no_escaped_unicode(right):
+    elif not args.disable_escaped_unicode and not c_no_escaped_unicode(right):
         return "c_no_escaped_unicode(right)"
-    elif not c_no_literals(["{{", "%s", "}}"], left):
+    elif not args.disable_literals_check and not c_no_literals(["{{", "%s", "}}"], left):
         return 'c_no_literals(["{{", "%s", "}}"], left)'
-    elif not c_no_literals(["{{", "%s", "}}"], right):
+    elif not args.disable_literals_check and not c_no_literals(["{{", "%s", "}}"], right):
         return 'c_no_literals(["{{", "%s", "}}"], right)'
-    elif left.istitle() and right.istitle():
+    elif not args.disable_titlecased_check and left.istitle() and right.istitle():
         return 'left.istitle() and right.istitle()'
     elif (not args.disable_lang_ident and not  c_reliable_long_language(left, args.source_lang)):
         return "c_reliable_long_language(left, sourcelang)"
@@ -417,7 +442,7 @@ def wrong_tu(left, right, args, lm_filter = None, porn_removal = None, porn_toke
     elif  args.disable_lm_filter == False and lm_filter != None and lm_filter.score(left, right) < args.lm_threshold:    
         return "lm_filter.score(left, right) < args.lm_threshold"
     return False
-    
+
     
 def reduce_process(output_queue, args):
     h = []
