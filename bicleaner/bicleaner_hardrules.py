@@ -70,7 +70,7 @@ def initialization():
     groupO.add_argument('-p', '--processes', type=int, default=max(1, cpu_count()-1), help="Number of processes to use")
 
     groupO.add_argument('--disable_lang_ident', default=False, action='store_true', help="Don't apply rules that use language detecting")
-    groupO.add_argument('--disable_minimal_length', default=True, action='store_true', help="Don't apply minimal length rule")
+    groupO.add_argument('--disable_minimal_length', default=False, action='store_true', help="Don't apply minimal length rule")
     #here are the added arguments
     groupO.add_argument('--disable_max_length', default=False, action='store_true', help="Don't apply max length rule")
     groupO.add_argument('--disable_reply', default=False, action='store_true')
